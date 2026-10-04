@@ -138,6 +138,13 @@
     .money input { flex: 1; min-width: 0; background: transparent; border: 0; outline: none; color: var(--white); padding: .7rem .9rem; font-size: 28px; font-weight: 700; letter-spacing: .01em; }
     .money input::placeholder { color: var(--dim); }
 
+    /* Tanggal transaksi */
+    .date-row { display: flex; gap: .5rem; align-items: stretch; }
+    .date-row .field { flex: 1; min-width: 0; color-scheme: dark; font-variant-numeric: tabular-nums; }
+    .date-row .field::-webkit-calendar-picker-indicator { cursor: pointer; opacity: .75; }
+    .date-row .chip { padding: 0 .8rem; height: auto; font-size: 14px; white-space: nowrap; }
+    .chip[aria-pressed="true"] { border-color: var(--accent, var(--red)); color: #0f1923; background: var(--accent, var(--red)); }
+
     .fold { display: grid; grid-template-rows: 1fr; transition: grid-template-rows .3s ease, opacity .25s ease; }
     .fold > div { overflow: hidden; min-height: 0; }
     .fold.closed { grid-template-rows: 0fr; opacity: 0; pointer-events: none; }
@@ -416,6 +423,17 @@
               <p class="text-[13px] dim mt-2">Tombol cepat bisa diklik berkali-kali untuk menjumlahkan.</p>
             </div>
 
+            <!-- 04 Tanggal -->
+            <div class="mt-5">
+              <div class="flex items-baseline gap-2 mb-2.5"><span class="step">04</span><label for="tx-date" class="label">Tanggal</label></div>
+              <div class="date-row">
+                <input id="tx-date" class="field cut-r" type="date" required />
+                <button type="button" class="chip cut-l" data-day="0">Hari ini</button>
+                <button type="button" class="chip cut-l" data-day="1">Kemarin</button>
+              </div>
+              <p id="date-hint" class="text-[13px] dim mt-2"></p>
+            </div>
+
             <button id="submit-btn" type="submit" class="btn-main cut mt-6" style="--c:14px">Tambah Transaksi</button>
           </form>
         </div>
@@ -489,6 +507,7 @@
     const submitBtn = $('submit-btn'), formFrame = $('form-frame');
     const nameWrap = $('name-wrap'), saveWrap = $('save-wrap');
     const catGrid = $('cat-grid'), logEl = $('log');
+    const dateEl = $('tx-date'), dateHint = $('date-hint');
 
     // ====================== UTIL ======================
     const rp = (n) => (n < 0 ? '-' : '') + 'Rp ' + Math.abs(Math.round(n)).toLocaleString('id-ID');
@@ -500,9 +519,11 @@
     function load() {
       try {
         const raw = JSON.parse(localStorage.getItem(LS_KEY));
-        return Array.isArray(raw) ? raw.filter((t) => t && CATS[t.cat] && t.amount > 0) : [];
+        return Array.isArray(raw) ? sortTxs(raw.filter((t) => t && CATS[t.cat] && t.amount > 0)) : [];
       } catch (e) { return []; }
     }
+    // Terbaru di atas — dibutuhkan untuk pengelompokan per bulan/hari di riwayat
+    function sortTxs(list) { return list.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0)); }
     function persist() {
       try {
         localStorage.setItem(LS_KEY, JSON.stringify(txs));
@@ -594,6 +615,27 @@
       else setAmount(getAmount() + Number(b.dataset.add));
     });
 
+    // ====================== TANGGAL ======================
+    const shiftDay = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return dayKey(d); };
+
+    function setDate(key) { dateEl.value = key; syncDate(); }
+    function syncDate() {
+      const key = dateEl.value;
+      document.querySelectorAll('[data-day]').forEach((b) => b.setAttribute('aria-pressed', key === shiftDay(Number(b.dataset.day))));
+      if (!key) { dateHint.textContent = 'Pilih tanggal transaksi.'; return; }
+      const [y, m, d] = key.split('-').map(Number);
+      dateHint.textContent = 'Dicatat pada ' + new Date(y, m - 1, d).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    }
+    // Tanggal yang dipilih + jam saat ini, supaya urutan dalam satu hari tetap masuk akal
+    function dateToISO(key) {
+      const [y, m, d] = key.split('-').map(Number);
+      const now = new Date();
+      return new Date(y, m - 1, d, now.getHours(), now.getMinutes(), now.getSeconds()).toISOString();
+    }
+
+    dateEl.addEventListener('input', syncDate);
+    document.querySelectorAll('[data-day]').forEach((b) => b.addEventListener('click', () => setDate(shiftDay(Number(b.dataset.day)))));
+
     // ====================== SUBMIT ======================
     form.addEventListener('submit', (e) => {
       e.preventDefault();
@@ -602,6 +644,9 @@
       const before = totals();
 
       if (!amount) { shake(amountEl.parentElement); amountEl.focus(); toast('Isi nominal dulu', 'out'); return; }
+      const dateKey = dateEl.value;
+      if (!dateKey) { shake(dateEl); dateEl.focus(); toast('Pilih tanggal dulu', 'out'); return; }
+      if (dateKey > dayKey(new Date())) { shake(dateEl); dateEl.focus(); toast('Tanggal tidak boleh di masa depan', 'out'); return; }
 
       let name;
       if (c.type === 'save') {
@@ -616,10 +661,11 @@
         if (!name) { shake(nameEl); nameEl.focus(); toast('Isi nama transaksi dulu', 'out'); return; }
       }
 
-      txs.unshift({
+      txs.push({
         id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
-        cat: currentCat, type: c.type, name, amount, at: new Date().toISOString()
+        cat: currentCat, type: c.type, name, amount, at: dateToISO(dateKey)
       });
+      sortTxs(txs);
       persist();
       render();
 
@@ -638,10 +684,19 @@
     function dayLabel(key) {
       const now = new Date();
       const yest = new Date(now); yest.setDate(now.getDate() - 1);
-      if (key === dayKey(now)) return 'Hari ini';
-      if (key === dayKey(yest)) return 'Kemarin';
       const [y, m, d] = key.split('-').map(Number);
-      return new Date(y, m - 1, d).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
+      const full = new Date(y, m - 1, d).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
+      if (key === dayKey(now)) return 'Hari ini · ' + full;
+      if (key === dayKey(yest)) return 'Kemarin · ' + full;
+      return full;
+    }
+
+    function sumHTML(t) {
+      return [
+        t.income  ? `<span>Masuk <b class="tnum font-bold" style="color:var(--in)">${rp(t.income)}</b></span>` : '',
+        t.expense ? `<span>Keluar <b class="tnum font-bold" style="color:var(--out)">${rp(t.expense)}</b></span>` : '',
+        t.saving  ? `<span>Nabung <b class="tnum font-bold" style="color:var(--save)">${rp(t.saving)}</b></span>` : ''
+      ].join('');
     }
 
     function renderLog() {
@@ -667,24 +722,22 @@
         groups[groups.length - 1].items.push(tx);
       }
 
-      logEl.innerHTML = groups.map((g) => {
-        const tt = totals(g.items);
-        return `
+      logEl.innerHTML = groups.map((g) => `
         <div class="day-head">
           <span class="label" style="color:var(--white)">${esc(dayLabel(g.key))}</span>
-          ${tt.expense ? `<span class="text-[13px] muted">Keluar <b class="tnum font-bold" style="color:var(--out)">${rp(tt.expense)}</b></span>` : ''}
+          <span class="text-[13px] muted flex flex-wrap gap-x-3 justify-end">${sumHTML(totals(g.items))}</span>
         </div>
         <ul class="flex flex-col gap-px px-2">
           ${g.items.map(itemHTML).join('')}
-        </ul>`;
-      }).join('');
+        </ul>`).join('');
     }
 
     function itemHTML(t) {
       const c = CATS[t.cat];
       const accent = TYPE_ACCENT[t.type];
       const sign = t.type === 'in' ? '+' : '−';
-      const time = new Date(t.at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+      const at = new Date(t.at);
+      const time = at.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }) + ' · ' + at.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
       return `
         <li class="kf cut-r" style="--accent:${accent}">
           <span class="ico cut-l">${svg(t.cat)}</span>
@@ -771,11 +824,13 @@
       const now = new Date();
       $('clock').textContent = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
       $('today-date').textContent = now.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+      dateEl.max = dayKey(now);
     }
 
     // ====================== INIT ======================
     renderCats();
     selectCat(currentCat);
+    setDate(dayKey(new Date()));
     render();
     tickClock();
     setInterval(tickClock, 15000);
