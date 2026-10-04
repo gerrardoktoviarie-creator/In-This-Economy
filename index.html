@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0f1923" />
+  <title>In This Economy — Catat Keuangan</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --bg: #0f1923;
+      --panel: #1f2326;
+      --panel-2: #192029;
+      --red: #ff4655;
+      --white: #ece8e1;
+      --muted: #a7adb1;   /* teks sekunder: solid, kontras cukup → lebih tajam */
+      --dim: #6f787e;
+      --line: #2c343b;
+      --line-2: #3a434b;
+      --in: #00f5d4;
+      --out: #ff4655;
+      --save: #ffd166;
+    }
+
+    * { -webkit-tap-highlight-color: transparent; }
+    html, body { background: var(--bg); color: var(--white); }
+    body {
+      font-family: 'Barlow Semi Condensed', 'Segoe UI', system-ui, sans-serif;
+      font-weight: 500;
+      font-size: 16px;
+      min-height: 100vh;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+    }
+    .font-display { font-family: 'Anton', sans-serif; font-weight: 400; letter-spacing: .03em; }
+    .tnum { font-variant-numeric: tabular-nums; }
+    .muted { color: var(--muted); }
+    .dim { color: var(--dim); }
+
+    /* Label kecil uppercase — ukuran min 12px & tracking secukupnya biar nggak blur */
+    .label { font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+    .step { font-size: 12px; font-weight: 700; color: var(--red); letter-spacing: .08em; }
+
+    /* ---------- Background ---------- */
+    .bg-layer {
+      position: fixed; inset: 0; z-index: -1; pointer-events: none;
+      background-image:
+        linear-gradient(rgba(236,232,225,.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(236,232,225,.03) 1px, transparent 1px);
+      background-size: 48px 48px;
+    }
+    .bg-layer::before {
+      content: ""; position: absolute; inset: 0;
+      background:
+        radial-gradient(60% 50% at 85% 0%, rgba(255,70,85,.12), transparent 70%),
+        radial-gradient(50% 40% at 0% 100%, rgba(0,245,212,.05), transparent 70%);
+    }
+    .bg-layer::after {
+      content: ""; position: absolute; top: 0; right: 0; width: 40vw; height: 100%;
+      background: repeating-linear-gradient(-60deg, rgba(255,70,85,.04) 0 2px, transparent 2px 24px);
+      -webkit-mask-image: linear-gradient(90deg, transparent, #000 60%);
+              mask-image: linear-gradient(90deg, transparent, #000 60%);
+    }
+    .bg-num {
+      position: fixed; z-index: -1; pointer-events: none; user-select: none;
+      font-family: 'Anton', sans-serif; line-height: .8;
+      color: transparent; -webkit-text-stroke: 1px rgba(236,232,225,.045);
+    }
+
+    /* ---------- Clipped corners ---------- */
+    .cut   { --c: 16px; clip-path: polygon(0 0, calc(100% - var(--c)) 0, 100% var(--c), 100% 100%, var(--c) 100%, 0 calc(100% - var(--c))); }
+    .cut-r { --c: 10px; clip-path: polygon(0 0, calc(100% - var(--c)) 0, 100% var(--c), 100% 100%, 0 100%); }
+    .cut-l { --c: 8px;  clip-path: polygon(var(--c) 0, 100% 0, 100% 100%, 0 100%, 0 var(--c)); }
+
+    /* Border untuk shape yang di-clip (frame 1px + inner) */
+    .frame {
+      padding: 1px;
+      background: linear-gradient(135deg, var(--accent, var(--red)) 0%, var(--line-2) 30%, var(--line) 100%);
+      transition: background .25s;
+    }
+    .inner { background: linear-gradient(165deg, var(--panel) 0%, var(--panel-2) 100%); height: 100%; position: relative; }
+
+    /* Hover glow TANPA filter/transform (filter bikin teks di-rasterize → ngeblur) */
+    .glow .inner { transition: box-shadow .25s; }
+    .glow:hover .frame { background: linear-gradient(135deg, var(--accent) 0%, color-mix(in srgb, var(--accent) 45%, var(--line-2)) 45%, var(--line-2) 100%); }
+    .glow:hover .inner { box-shadow: inset 0 0 40px -18px var(--accent); }
+
+    .stripes { background: repeating-linear-gradient(-45deg, var(--accent, var(--red)) 0 2px, transparent 2px 7px); opacity: .6; }
+
+    /* ---------- Stat card ---------- */
+    .stat { display: flex; flex-direction: column; justify-content: space-between; gap: .75rem; min-height: 128px; }
+    .stat .tick { position: absolute; top: 0; left: 0; width: 44px; height: 3px; background: var(--accent); }
+    .stat .corner { position: absolute; right: 0; bottom: 0; width: 22px; height: 22px; background: linear-gradient(135deg, transparent 50%, var(--accent) 50%); }
+    .stat .amount { font-weight: 700; line-height: 1.05; letter-spacing: .01em; overflow-wrap: anywhere; }
+
+    /* ---------- Section heading ---------- */
+    .sec-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: .75rem; min-height: 32px; }
+    .sec-title { display: flex; align-items: center; gap: .6rem; font-size: 1.35rem; line-height: 1; text-transform: uppercase; }
+    .sec-title::before { content: ""; width: 9px; height: 9px; background: var(--red); transform: rotate(45deg); flex: none; }
+
+    /* ---------- Kategori ---------- */
+    .cat-btn {
+      --accent: var(--out);
+      display: flex; align-items: center; gap: .65rem; min-height: 58px;
+      padding: .55rem .75rem; text-align: left; text-transform: uppercase; letter-spacing: .04em;
+      font-size: 15px; font-weight: 600; line-height: 1.15;
+      background: rgba(236,232,225,.03); border: 1px solid var(--line); color: var(--muted);
+      transition: background .2s, color .2s, border-color .2s, box-shadow .2s;
+    }
+    .cat-btn .ic { width: 34px; height: 34px; flex: none; display: grid; place-items: center; border: 1px solid var(--line-2); background: rgba(15,25,35,.6); transition: all .2s; }
+    .cat-btn svg { width: 19px; height: 19px; }
+    .cat-btn:hover { color: var(--white); border-color: var(--line-2); background: rgba(236,232,225,.05); }
+    .cat-btn[aria-pressed="true"] {
+      color: var(--white); border-color: var(--accent);
+      background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 18%, transparent), rgba(236,232,225,.02) 80%);
+      box-shadow: inset 3px 0 0 var(--accent);
+    }
+    .cat-btn[aria-pressed="true"] .ic { color: #0f1923; background: var(--accent); border-color: var(--accent); }
+
+    /* ---------- Input ---------- */
+    .field {
+      width: 100%; background: #111b24; border: 1px solid var(--line-2); color: var(--white);
+      padding: .8rem .9rem; font-size: 17px; font-weight: 500; outline: none; transition: border-color .2s, box-shadow .2s;
+    }
+    .field::placeholder { color: var(--dim); }
+    .field:focus { border-color: var(--accent, var(--red)); box-shadow: 0 0 0 1px var(--accent, var(--red)); }
+
+    .money { display: flex; align-items: stretch; background: #111b24; border: 1px solid var(--line-2); transition: border-color .2s, box-shadow .2s; }
+    .money:focus-within { border-color: var(--accent, var(--red)); box-shadow: 0 0 0 1px var(--accent, var(--red)); }
+    .money .pre { display: flex; align-items: center; padding: 0 .9rem; font-weight: 700; font-size: 18px; color: var(--muted); border-right: 1px solid var(--line-2); background: rgba(236,232,225,.03); }
+    .money input { flex: 1; min-width: 0; background: transparent; border: 0; outline: none; color: var(--white); padding: .7rem .9rem; font-size: 28px; font-weight: 700; letter-spacing: .01em; }
+    .money input::placeholder { color: var(--dim); }
+
+    .fold { display: grid; grid-template-rows: 1fr; transition: grid-template-rows .3s ease, opacity .25s ease; }
+    .fold > div { overflow: hidden; min-height: 0; }
+    .fold.closed { grid-template-rows: 0fr; opacity: 0; pointer-events: none; }
+
+    .chip {
+      height: 42px; font-size: 16px; font-weight: 700; border: 1px solid var(--line-2);
+      background: rgba(236,232,225,.03); color: var(--white); transition: color .15s, border-color .15s, background .15s;
+    }
+    .chip:hover { border-color: var(--accent, var(--red)); color: var(--accent, var(--red)); background: color-mix(in srgb, var(--accent, var(--red)) 8%, transparent); }
+    .chip:active { background: color-mix(in srgb, var(--accent, var(--red)) 18%, transparent); }
+    .chip.reset { color: var(--muted); font-weight: 600; }
+    .chip.reset:hover { color: var(--white); border-color: var(--muted); background: rgba(236,232,225,.05); }
+
+    /* ---------- Tombol utama ---------- */
+    .btn-main {
+      position: relative; width: 100%; height: 56px; font-family: 'Anton', sans-serif; font-size: 20px; letter-spacing: .1em;
+      text-transform: uppercase; color: #0f1923; background: var(--accent, var(--red)); transition: background .2s; overflow: hidden;
+    }
+    .btn-main::after {
+      content: ""; position: absolute; top: 0; bottom: 0; width: 40%; left: -60%;
+      background: linear-gradient(100deg, transparent, rgba(255,255,255,.35), transparent);
+      transition: left .5s ease; pointer-events: none;
+    }
+    .btn-main:hover { background: color-mix(in srgb, var(--accent, var(--red)) 85%, #fff); }
+    .btn-main:hover::after { left: 120%; }
+
+    /* ---------- Ringkasan hari ini ---------- */
+    .today { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); border: 1px solid var(--line); background: rgba(31,35,38,.6); }
+    .today > div { padding: .6rem .9rem; border-left: 1px solid var(--line); }
+    .today > div:first-child { border-left: 0; }
+
+    /* ---------- Killfeed / riwayat ---------- */
+    .kf {
+      --accent: var(--out);
+      position: relative; display: grid; grid-template-columns: auto minmax(0,1fr) auto auto; align-items: center; gap: .75rem;
+      padding: .7rem .6rem .7rem 1rem;
+      background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 13%, #16202a) 0%, #1c2228 40%);
+      animation: kfIn .3s ease both;
+    }
+    .kf::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent); }
+    .kf:hover { background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 22%, #16202a) 0%, #20272e 55%); }
+    .kf .ico { width: 38px; height: 38px; display: grid; place-items: center; color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); background: rgba(15,25,35,.6); }
+    .kf .ico svg { width: 19px; height: 19px; }
+    .kf .name { font-size: 17px; font-weight: 600; line-height: 1.2; }
+    .kf .amt { font-size: 18px; font-weight: 700; text-align: right; white-space: nowrap; }
+    .badge { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; padding: 1px 6px; color: #0f1923; background: var(--accent); white-space: nowrap; }
+    .del {
+      display: grid; place-items: center; height: 34px; min-width: 34px; padding: 0 .45rem;
+      color: var(--dim); border: 1px solid transparent; font-size: 12px; font-weight: 700; letter-spacing: .06em; transition: all .15s;
+    }
+    .del svg { width: 17px; height: 17px; }
+    .del:hover { color: var(--red); border-color: rgba(255,70,85,.5); }
+    .del.armed { color: #0f1923; background: var(--red); border-color: var(--red); }
+    @keyframes kfIn { from { opacity: 0; } to { opacity: 1; } }
+
+    .day-head { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .9rem 1rem .5rem; }
+
+    .tab {
+      display: inline-flex; align-items: center; gap: .4rem; height: 44px; padding: 0 .8rem;
+      font-size: 14px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted);
+      border-bottom: 2px solid transparent; transition: color .15s, border-color .15s;
+    }
+    .tab .n { font-size: 12px; color: var(--dim); }
+    .tab:hover { color: var(--white); }
+    .tab[aria-selected="true"] { color: var(--white); border-color: var(--red); }
+
+    .scroll::-webkit-scrollbar { width: 6px; }
+    .scroll::-webkit-scrollbar-thumb { background: var(--line-2); }
+    .scroll::-webkit-scrollbar-thumb:hover { background: var(--red); }
+
+    /* ---------- Toast (tanpa translate -50% supaya teks tetap tajam) ---------- */
+    .toast-wrap { position: fixed; left: 0; right: 0; bottom: 16px; z-index: 50; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 0 16px; pointer-events: none; }
+    .toast {
+      --accent: var(--in);
+      display: flex; align-items: center; gap: .6rem; padding: .75rem 1.1rem .75rem 1rem; max-width: 100%;
+      background: #222a31; border: 1px solid var(--line-2); border-left: 4px solid var(--accent);
+      font-size: 15px; font-weight: 600; letter-spacing: .03em;
+      box-shadow: 0 12px 30px -12px rgba(0,0,0,.7);
+      animation: fadeIn .25s ease both;
+    }
+    .toast.out { animation: fadeOut .25s ease both; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes fadeOut { to { opacity: 0; } }
+
+    .shake { animation: shake .35s; }
+    @keyframes shake { 20%, 60% { transform: translateX(-5px); } 40%, 80% { transform: translateX(5px); } }
+
+    .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--in); box-shadow: 0 0 8px var(--in); animation: blink 1.6s infinite; }
+    @keyframes blink { 50% { opacity: .3; } }
+
+    :focus-visible { outline: 2px solid var(--white); outline-offset: 2px; }
+    .field:focus-visible, .money input:focus-visible { outline: none; }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="bg-layer" aria-hidden="true"></div>
+  <div class="bg-num hidden lg:block" style="font-size:26vw; right:-2vw; bottom:-5vw;" aria-hidden="true">07</div>
+
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 pb-16">
+
+    <!-- ================= HEADER ================= -->
+    <header class="pt-6 pb-5 flex flex-wrap items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="cut" style="--c:10px; width:48px; height:48px; background:var(--red); display:grid; place-items:center;">
+          <svg viewBox="0 0 24 24" width="26" height="26" fill="#0f1923" aria-hidden="true"><path d="M2 4l9 12V20L2 8zM22 4l-7 9h-4l7-9z"/></svg>
+        </div>
+        <div>
+          <h1 class="font-display text-[28px] sm:text-[34px] leading-none uppercase">In This <span style="color:var(--red)">Economy</span></h1>
+          <p class="label mt-1.5" style="letter-spacing:.16em">Personal Finance Protocol</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3 pl-3 border-l-2" style="border-color:var(--red)">
+        <div>
+          <div class="flex items-center gap-2 label"><span class="live-dot"></span><span id="clock" class="tnum">--:--</span></div>
+          <div id="today-date" class="text-[15px] font-semibold mt-0.5"></div>
+        </div>
+      </div>
+    </header>
+
+    <div class="h-px w-full mb-6" style="background:linear-gradient(90deg,var(--red),var(--line-2) 30%,transparent)"></div>
+
+    <!-- ================= DASHBOARD CARDS ================= -->
+    <section aria-label="Ringkasan keuangan" class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div class="glow col-span-2 lg:col-span-1" style="--accent:var(--red)">
+        <div class="frame cut h-full"><div class="inner cut stat p-4 sm:p-5">
+          <span class="tick"></span>
+          <div class="flex items-center justify-between"><p class="label">Saldo Utama</p><span class="step dim">01</span></div>
+          <p id="s-balance" class="amount tnum text-[30px] sm:text-[32px]">Rp 0</p>
+          <div class="flex items-center gap-2"><div class="stripes h-2 w-12"></div><span class="text-[13px] muted">Siap dipakai</span></div>
+          <span class="corner"></span>
+        </div></div>
+      </div>
+
+      <div class="glow" style="--accent:var(--in)">
+        <div class="frame cut h-full"><div class="inner cut stat p-4 sm:p-5">
+          <span class="tick"></span>
+          <div class="flex items-center justify-between"><p class="label">Pemasukan</p><span class="step dim">02</span></div>
+          <p id="s-income" class="amount tnum text-[22px] sm:text-[26px]" style="color:var(--in)">Rp 0</p>
+          <div class="flex items-center gap-2"><div class="stripes h-2 w-8"></div><span id="c-income" class="text-[13px] muted">0 transaksi</span></div>
+          <span class="corner"></span>
+        </div></div>
+      </div>
+
+      <div class="glow" style="--accent:var(--out)">
+        <div class="frame cut h-full"><div class="inner cut stat p-4 sm:p-5">
+          <span class="tick"></span>
+          <div class="flex items-center justify-between"><p class="label">Pengeluaran</p><span class="step dim">03</span></div>
+          <p id="s-expense" class="amount tnum text-[22px] sm:text-[26px]" style="color:var(--out)">Rp 0</p>
+          <div class="flex items-center gap-2"><div class="stripes h-2 w-8"></div><span id="c-expense" class="text-[13px] muted">0 transaksi</span></div>
+          <span class="corner"></span>
+        </div></div>
+      </div>
+
+      <div class="glow col-span-2 lg:col-span-1" style="--accent:var(--save)">
+        <div class="frame cut h-full"><div class="inner cut stat p-4 sm:p-5">
+          <span class="tick"></span>
+          <div class="flex items-center justify-between"><p class="label">Total Tabungan</p><span class="step dim">04</span></div>
+          <p id="s-saving" class="amount tnum text-[26px] sm:text-[28px]" style="color:var(--save)">Rp 0</p>
+          <div class="flex items-center gap-2"><div class="stripes h-2 w-8"></div><span id="c-saving" class="text-[13px] muted">0x setor</span></div>
+          <span class="corner"></span>
+        </div></div>
+      </div>
+    </section>
+
+    <!-- Ringkasan hari ini -->
+    <div class="mt-3 sm:mt-4">
+      <div class="today cut-r">
+        <div><p class="label">Masuk hari ini</p><p id="t-in" class="tnum font-bold text-[17px] mt-0.5" style="color:var(--in)">Rp 0</p></div>
+        <div><p class="label">Keluar hari ini</p><p id="t-out" class="tnum font-bold text-[17px] mt-0.5" style="color:var(--out)">Rp 0</p></div>
+        <div><p class="label">Nabung hari ini</p><p id="t-save" class="tnum font-bold text-[17px] mt-0.5" style="color:var(--save)">Rp 0</p></div>
+      </div>
+    </div>
+
+    <!-- ================= MAIN ================= -->
+    <main class="grid lg:grid-cols-5 gap-6 lg:gap-8 mt-8 items-start">
+
+      <!-- ---------- FORM ---------- -->
+      <section class="lg:col-span-2 lg:sticky lg:top-4" aria-labelledby="form-title">
+        <div class="sec-head">
+          <h2 id="form-title" class="sec-title font-display">Input Transaksi</h2>
+        </div>
+
+        <div id="form-frame" class="frame cut" style="--c:20px">
+          <form id="tx-form" class="inner cut p-4 sm:p-5" style="--c:20px" autocomplete="off" novalidate>
+
+            <!-- 01 Kategori -->
+            <div class="flex items-baseline gap-2 mb-2.5"><span class="step">01</span><p class="label">Pilih Kategori</p></div>
+            <div id="cat-grid" class="grid grid-cols-2 gap-2" role="group" aria-label="Kategori transaksi"></div>
+
+            <!-- 02 Keterangan / info tabungan -->
+            <div class="mt-5">
+              <div id="name-wrap" class="fold">
+                <div>
+                  <div class="flex items-baseline gap-2 mb-2.5"><span class="step">02</span><label for="tx-name" class="label">Nama Transaksi / Keterangan</label></div>
+                  <input id="tx-name" class="field cut-r" type="text" maxlength="40" placeholder="Contoh: Nasi padang" />
+                </div>
+              </div>
+
+              <div id="save-wrap" class="fold closed">
+                <div>
+                  <div class="flex items-baseline gap-2 mb-2.5"><span class="step">02</span><p class="label">Mode Menabung</p></div>
+                  <div class="cut-r p-3.5 flex gap-3 items-start" style="background:linear-gradient(90deg,rgba(255,209,102,.13),rgba(255,209,102,.02)); border:1px solid rgba(255,209,102,.3); border-left:3px solid var(--save)">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--save)" stroke-width="2" stroke-linejoin="round" class="flex-none mt-0.5" aria-hidden="true"><path d="M12 2l3 6 6 .9-4.5 4.3 1 6.3L12 16.6 6.5 19.5l1-6.3L3 8.9 9 8z"/></svg>
+                    <div class="text-[15px] leading-snug">
+                      <p class="muted">Nama otomatis <b class="text-[var(--white)] font-semibold">"Tabungan Harian"</b>. Cukup isi nominal lalu konfirmasi.</p>
+                      <p class="muted mt-1.5">Saldo tersedia: <b id="avail" class="tnum font-bold" style="color:var(--save)">Rp 0</b></p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 03 Nominal -->
+            <div class="mt-5">
+              <div class="flex items-baseline gap-2 mb-2.5"><span class="step">03</span><label for="tx-amount" class="label">Nominal</label></div>
+              <div class="money cut-r">
+                <span class="pre">Rp</span>
+                <input id="tx-amount" class="tnum" type="text" inputmode="numeric" placeholder="0" />
+              </div>
+              <div class="grid grid-cols-3 gap-2 mt-2.5" id="quick">
+                <button type="button" class="chip cut-l tnum" data-add="10000">+10rb</button>
+                <button type="button" class="chip cut-l tnum" data-add="25000">+25rb</button>
+                <button type="button" class="chip cut-l tnum" data-add="50000">+50rb</button>
+                <button type="button" class="chip cut-l tnum" data-add="100000">+100rb</button>
+                <button type="button" class="chip cut-l tnum" data-add="200000">+200rb</button>
+                <button type="button" class="chip cut-l reset" data-reset>Reset</button>
+              </div>
+              <p class="text-[13px] dim mt-2">Tombol cepat bisa diklik berkali-kali untuk menjumlahkan.</p>
+            </div>
+
+            <button id="submit-btn" type="submit" class="btn-main cut mt-6" style="--c:14px">Tambah Transaksi</button>
+          </form>
+        </div>
+      </section>
+
+      <!-- ---------- RIWAYAT ---------- -->
+      <section class="lg:col-span-3" aria-labelledby="log-title">
+        <div class="sec-head">
+          <h2 id="log-title" class="sec-title font-display">Riwayat Transaksi</h2>
+          <button id="wipe" type="button" class="label hover:text-[var(--red)] transition-colors">Hapus semua</button>
+        </div>
+
+        <div class="frame cut" style="--accent:var(--line-2); --c:20px">
+          <div class="inner cut" style="--c:20px">
+            <div class="flex px-2 border-b overflow-x-auto" style="border-color:var(--line)" role="tablist" id="tabs">
+              <button class="tab" role="tab" data-filter="all"  aria-selected="true">Semua <span class="n tnum" data-count="all">0</span></button>
+              <button class="tab" role="tab" data-filter="in"   aria-selected="false">Masuk <span class="n tnum" data-count="in">0</span></button>
+              <button class="tab" role="tab" data-filter="out"  aria-selected="false">Keluar <span class="n tnum" data-count="out">0</span></button>
+              <button class="tab" role="tab" data-filter="save" aria-selected="false">Nabung <span class="n tnum" data-count="save">0</span></button>
+            </div>
+            <div id="log" class="scroll overflow-y-auto pb-3" style="max-height:min(70vh,660px)"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="mt-12 pt-5 border-t text-center text-[13px] dim" style="border-color:var(--line)">
+      Data tersimpan otomatis di browser ini (localStorage).
+    </footer>
+  </div>
+
+  <div id="toasts" class="toast-wrap" aria-live="polite"></div>
+
+  <script>
+  (() => {
+    'use strict';
+
+    // ====================== KONFIGURASI ======================
+    const LS_KEY = 'inthiseconomy.transactions.v1';
+    const LS_SUMMARY = 'inthiseconomy.summary.v1';
+    const SAVING_NAME = 'Tabungan Harian';
+    const MAX_AMOUNT = 999999999999;
+
+    const ICONS = {
+      income:    '<path d="M12 3v11m0 0l-4-4m4 4l4-4M4 15v5h16v-5"/>',
+      food:      '<path d="M6 3v7a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V3M8 3v18M17 21V3c-2 1.5-3 4-3 7s1 3 3 3"/>',
+      transport: '<path d="M5 16V11l2-5h10l2 5v5H5zM5 11h14"/><circle cx="8" cy="16.5" r="1.8"/><circle cx="16" cy="16.5" r="1.8"/>',
+      fun:       '<path d="M6.5 8h11A3.5 3.5 0 0 1 21 11.5v2a3 3 0 0 1-5.2 2L14.5 14h-5l-1.3 1.5A3 3 0 0 1 3 13.5v-2A3.5 3.5 0 0 1 6.5 8zM7.5 10.5v3M6 12h3M15.5 11.5h.01M17.5 13h.01"/>',
+      saving:    '<rect x="3" y="5" width="18" height="14" rx="1"/><circle cx="12" cy="12" r="3.2"/><path d="M12 8.8V7M7 19v2M17 19v2"/>',
+      trash:     '<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>'
+    };
+    const svg = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[k]}</svg>`;
+
+    const CATS = {
+      income:    { label: 'Pemasukan',           type: 'in',   color: 'var(--in)',   hint: 'Contoh: Gaji, uang saku, bonus' },
+      food:      { label: 'Makanan & Minuman',   type: 'out',  color: 'var(--out)',  hint: 'Contoh: Nasi padang, kopi susu' },
+      transport: { label: 'Transportasi',        type: 'out',  color: 'var(--out)',  hint: 'Contoh: Ojol ke kampus, bensin' },
+      fun:       { label: 'Nongkrong / Hiburan', type: 'out',  color: 'var(--out)',  hint: 'Contoh: Mabar di warkop, nonton' },
+      saving:    { label: 'Menabung',            type: 'save', color: 'var(--save)', hint: '' }
+    };
+    const TYPE_ACCENT = { in: 'var(--in)', out: 'var(--out)', save: 'var(--save)' };
+
+    // ====================== STATE ======================
+    let txs = load();
+    let currentCat = 'food';
+    let filter = 'all';
+
+    // ====================== ELEMEN ======================
+    const $ = (id) => document.getElementById(id);
+    const form = $('tx-form'), nameEl = $('tx-name'), amountEl = $('tx-amount');
+    const submitBtn = $('submit-btn'), formFrame = $('form-frame');
+    const nameWrap = $('name-wrap'), saveWrap = $('save-wrap');
+    const catGrid = $('cat-grid'), logEl = $('log');
+
+    // ====================== UTIL ======================
+    const rp = (n) => (n < 0 ? '-' : '') + 'Rp ' + Math.abs(Math.round(n)).toLocaleString('id-ID');
+    const digits = (s) => Number(String(s).replace(/\D/g, '')) || 0;
+    const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const dayKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    function load() {
+      try {
+        const raw = JSON.parse(localStorage.getItem(LS_KEY));
+        return Array.isArray(raw) ? raw.filter((t) => t && CATS[t.cat] && t.amount > 0) : [];
+      } catch (e) { return []; }
+    }
+    function persist() {
+      try {
+        localStorage.setItem(LS_KEY, JSON.stringify(txs));
+        localStorage.setItem(LS_SUMMARY, JSON.stringify(totals()));
+      } catch (e) { toast('Gagal menyimpan ke browser', 'out'); }
+    }
+
+    // Saldo selalu dihitung ulang dari daftar transaksi,
+    // jadi hapus transaksi = saldo otomatis menyesuaikan.
+    function totals(list = txs) {
+      let income = 0, expense = 0, saving = 0, nIn = 0, nOut = 0, nSave = 0;
+      for (const t of list) {
+        if (t.type === 'in') { income += t.amount; nIn++; }
+        else if (t.type === 'out') { expense += t.amount; nOut++; }
+        else if (t.type === 'save') { saving += t.amount; nSave++; }
+      }
+      return { balance: income - expense - saving, income, expense, saving, nIn, nOut, nSave };
+    }
+
+    function animateNum(el, to) {
+      const from = Number(el.dataset.v || 0);
+      el.dataset.v = to;
+      if (reduceMotion || from === to) { el.textContent = rp(to); return; }
+      const t0 = performance.now(), dur = 500;
+      const step = (now) => {
+        const p = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - p, 3);
+        el.textContent = rp(from + (to - from) * e);
+        if (p < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    }
+
+    function toast(msg, type = 'in') {
+      const el = document.createElement('div');
+      el.className = 'toast cut-r';
+      el.style.setProperty('--accent', TYPE_ACCENT[type] || TYPE_ACCENT.in);
+      el.innerHTML = `<span style="color:var(--accent)">&#9670;</span><span>${esc(msg)}</span>`;
+      $('toasts').appendChild(el);
+      setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 250); }, 2600);
+    }
+
+    function shake(el) { el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); }
+
+    // ====================== KATEGORI ======================
+    function renderCats() {
+      catGrid.innerHTML = Object.entries(CATS).map(([key, c]) => `
+        <button type="button" class="cat-btn cut-l ${key === 'saving' ? 'col-span-2' : ''}"
+          data-cat="${key}" aria-pressed="${key === currentCat}" style="--accent:${c.color}">
+          <span class="ic cut-l">${svg(key)}</span><span>${c.label}</span>
+        </button>`).join('');
+    }
+
+    function selectCat(key) {
+      currentCat = key;
+      const c = CATS[key], isSave = c.type === 'save';
+      catGrid.querySelectorAll('.cat-btn').forEach((b) => b.setAttribute('aria-pressed', b.dataset.cat === key));
+      formFrame.style.setProperty('--accent', c.color);
+      form.style.setProperty('--accent', c.color);
+
+      nameWrap.classList.toggle('closed', isSave);
+      saveWrap.classList.toggle('closed', !isSave);
+      // Hanya satu panel yang memakan tempat
+      nameWrap.style.display = isSave ? 'none' : '';
+      saveWrap.style.display = isSave ? '' : 'none';
+      if (isSave) nameEl.value = '';
+      nameEl.placeholder = c.hint;
+
+      submitBtn.textContent = isSave ? 'Konfirmasi Menabung' : c.type === 'in' ? 'Tambah Pemasukan' : 'Tambah Pengeluaran';
+    }
+
+    catGrid.addEventListener('click', (e) => {
+      const b = e.target.closest('.cat-btn');
+      if (b) selectCat(b.dataset.cat);
+    });
+
+    // ====================== NOMINAL ======================
+    const getAmount = () => digits(amountEl.value);
+    const setAmount = (n) => {
+      n = Math.min(MAX_AMOUNT, Math.max(0, n));
+      amountEl.value = n ? n.toLocaleString('id-ID') : '';
+    };
+
+    amountEl.addEventListener('input', () => setAmount(getAmount()));
+
+    $('quick').addEventListener('click', (e) => {
+      const b = e.target.closest('button');
+      if (!b) return;
+      if (b.hasAttribute('data-reset')) setAmount(0);
+      else setAmount(getAmount() + Number(b.dataset.add));
+    });
+
+    // ====================== SUBMIT ======================
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const c = CATS[currentCat];
+      const amount = getAmount();
+      const before = totals();
+
+      if (!amount) { shake(amountEl.parentElement); amountEl.focus(); toast('Isi nominal dulu', 'out'); return; }
+
+      let name;
+      if (c.type === 'save') {
+        name = SAVING_NAME;
+        if (amount > before.balance) {
+          shake(amountEl.parentElement);
+          toast(`Saldo kurang. Maksimal nabung ${rp(Math.max(0, before.balance))}`, 'out');
+          return;
+        }
+      } else {
+        name = nameEl.value.trim();
+        if (!name) { shake(nameEl); nameEl.focus(); toast('Isi nama transaksi dulu', 'out'); return; }
+      }
+
+      txs.unshift({
+        id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+        cat: currentCat, type: c.type, name, amount, at: new Date().toISOString()
+      });
+      persist();
+      render();
+
+      setAmount(0);
+      nameEl.value = '';
+
+      if (c.type === 'save') toast(`+${rp(amount)} masuk tabungan`, 'save');
+      else if (c.type === 'in') toast(`Pemasukan ${rp(amount)} tercatat`, 'in');
+      else if (before.balance - amount < 0) toast('Tercatat — saldo utama sekarang minus!', 'out');
+      else toast(`Pengeluaran ${rp(amount)} tercatat`, 'out');
+
+      (c.type === 'save' ? amountEl : nameEl).focus({ preventScroll: true });
+    });
+
+    // ====================== RIWAYAT ======================
+    function dayLabel(key) {
+      const now = new Date();
+      const yest = new Date(now); yest.setDate(now.getDate() - 1);
+      if (key === dayKey(now)) return 'Hari ini';
+      if (key === dayKey(yest)) return 'Kemarin';
+      const [y, m, d] = key.split('-').map(Number);
+      return new Date(y, m - 1, d).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
+    }
+
+    function renderLog() {
+      const list = filter === 'all' ? txs : txs.filter((t) => t.type === filter);
+      const t = totals();
+      const counts = { all: txs.length, in: t.nIn, out: t.nOut, save: t.nSave };
+      document.querySelectorAll('[data-count]').forEach((el) => { el.textContent = counts[el.dataset.count]; });
+
+      if (!list.length) {
+        logEl.innerHTML = `
+          <div class="py-16 px-6 text-center">
+            <div class="font-display text-[40px] uppercase leading-none" style="color:var(--line-2)">No Data</div>
+            <p class="muted text-[15px] mt-3">${txs.length ? 'Tidak ada transaksi di filter ini.' : 'Belum ada transaksi — catat yang pertama!'}</p>
+          </div>`;
+        return;
+      }
+
+      // Kelompokkan per hari (data sudah urut terbaru di atas)
+      const groups = [];
+      for (const tx of list) {
+        const k = dayKey(new Date(tx.at));
+        if (!groups.length || groups[groups.length - 1].key !== k) groups.push({ key: k, items: [] });
+        groups[groups.length - 1].items.push(tx);
+      }
+
+      logEl.innerHTML = groups.map((g) => {
+        const tt = totals(g.items);
+        return `
+        <div class="day-head">
+          <span class="label" style="color:var(--white)">${esc(dayLabel(g.key))}</span>
+          ${tt.expense ? `<span class="text-[13px] muted">Keluar <b class="tnum font-bold" style="color:var(--out)">${rp(tt.expense)}</b></span>` : ''}
+        </div>
+        <ul class="flex flex-col gap-px px-2">
+          ${g.items.map(itemHTML).join('')}
+        </ul>`;
+      }).join('');
+    }
+
+    function itemHTML(t) {
+      const c = CATS[t.cat];
+      const accent = TYPE_ACCENT[t.type];
+      const sign = t.type === 'in' ? '+' : '−';
+      const time = new Date(t.at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+      return `
+        <li class="kf cut-r" style="--accent:${accent}">
+          <span class="ico cut-l">${svg(t.cat)}</span>
+          <div class="min-w-0">
+            <p class="name truncate">${esc(t.name)}</p>
+            <div class="flex items-center gap-2 mt-1">
+              <span class="badge">${esc(c.label)}</span>
+              <span class="text-[13px] muted tnum">${time}</span>
+            </div>
+          </div>
+          <span class="amt tnum" style="color:${accent}">${sign}${rp(t.amount)}</span>
+          <button type="button" class="del cut-l" data-del="${esc(t.id)}" aria-label="Hapus ${esc(t.name)}" title="Hapus">${svg('trash')}</button>
+        </li>`;
+    }
+
+    // Hapus: klik 1x = minta konfirmasi, klik 2x = hapus
+    logEl.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-del]');
+      if (!b) return;
+      if (!b.classList.contains('armed')) {
+        logEl.querySelectorAll('.del.armed').forEach(disarm);
+        b.classList.add('armed');
+        b.textContent = 'YAKIN?';
+        b._t = setTimeout(() => disarm(b), 3000);
+        return;
+      }
+      const id = b.dataset.del;
+      const t = txs.find((x) => x.id === id);
+      txs = txs.filter((x) => x.id !== id);
+      persist();
+      render();
+      if (t) toast('Dihapus — saldo disesuaikan', t.type === 'in' ? 'out' : 'in');
+    });
+    function disarm(b) { clearTimeout(b._t); b.classList.remove('armed'); b.innerHTML = svg('trash'); }
+
+    $('tabs').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-filter]');
+      if (!b) return;
+      filter = b.dataset.filter;
+      $('tabs').querySelectorAll('.tab').forEach((x) => x.setAttribute('aria-selected', x === b));
+      renderLog();
+    });
+
+    // Hapus semua data (2x klik)
+    const wipe = $('wipe');
+    wipe.addEventListener('click', () => {
+      if (!txs.length) { toast('Belum ada data', 'save'); return; }
+      if (!wipe.dataset.armed) {
+        wipe.dataset.armed = '1';
+        wipe.textContent = 'Klik lagi untuk hapus semua';
+        wipe.style.color = 'var(--red)';
+        setTimeout(() => { delete wipe.dataset.armed; wipe.textContent = 'Hapus semua'; wipe.style.color = ''; }, 3000);
+        return;
+      }
+      txs = [];
+      persist();
+      render();
+      toast('Semua data dihapus', 'out');
+    });
+
+    // ====================== RENDER ======================
+    function renderStats() {
+      const t = totals();
+      animateNum($('s-balance'), t.balance);
+      animateNum($('s-income'), t.income);
+      animateNum($('s-expense'), t.expense);
+      animateNum($('s-saving'), t.saving);
+      $('s-balance').style.color = t.balance < 0 ? 'var(--red)' : 'var(--white)';
+      $('c-income').textContent = `${t.nIn} transaksi`;
+      $('c-expense').textContent = `${t.nOut} transaksi`;
+      $('c-saving').textContent = `${t.nSave}x setor`;
+      $('avail').textContent = rp(t.balance);
+
+      const today = dayKey(new Date());
+      const td = totals(txs.filter((x) => dayKey(new Date(x.at)) === today));
+      $('t-in').textContent = rp(td.income);
+      $('t-out').textContent = rp(td.expense);
+      $('t-save').textContent = rp(td.saving);
+    }
+
+    function render() { renderStats(); renderLog(); }
+
+    function tickClock() {
+      const now = new Date();
+      $('clock').textContent = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+      $('today-date').textContent = now.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    }
+
+    // ====================== INIT ======================
+    renderCats();
+    selectCat(currentCat);
+    render();
+    tickClock();
+    setInterval(tickClock, 15000);
+
+    // Sinkron kalau app dibuka di 2 tab
+    window.addEventListener('storage', (e) => { if (e.key === LS_KEY) { txs = load(); render(); } });
+  })();
+  </script>
+</body>
+</html>
