@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#0f1923" />
   <title>In This Economy — Catat Keuangan</title>
 
@@ -231,6 +231,49 @@
     :focus-visible { outline: 2px solid var(--white); outline-offset: 2px; }
     .field:focus-visible, .money input:focus-visible { outline: none; }
 
+    /* ====================== RESPONSIF ====================== */
+    /* Angka di card menyesuaikan lebar layar */
+    .amt-xl { font-size: clamp(28px, 7vw, 34px); }
+    .amt-md { font-size: clamp(20px, 5.4vw, 26px); }
+    .today-amt { font-size: clamp(14px, 3.8vw, 17px); overflow-wrap: anywhere; line-height: 1.15; }
+    .toast-wrap { bottom: max(16px, env(safe-area-inset-bottom)); }
+
+    /* HP (< 640px) */
+    @media (max-width: 639px) {
+      .today > div { padding: .55rem .65rem; }
+      .stat { min-height: 112px; }
+      .sec-title { font-size: 1.2rem; }
+      .cat-btn { font-size: 14px; min-height: 54px; padding: .5rem .6rem; gap: .5rem; }
+      .cat-btn .ic { width: 30px; height: 30px; }
+      .money input { font-size: 24px; }
+      /* Killfeed: ikon disembunyikan supaya nama transaksi dapat ruang */
+      .kf { grid-template-columns: minmax(0,1fr) auto auto; gap: .5rem; padding: .65rem .4rem .65rem .85rem; }
+      .kf .ico { display: none; }
+      .kf .name { font-size: 16px; }
+      .kf .amt { font-size: 16px; }
+      .badge { max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
+      .day-head { padding: .85rem .75rem .45rem; }
+      .tab { padding: 0 .6rem; font-size: 13px; letter-spacing: .05em; }
+    }
+
+    /* Tablet (768–1023px): form & riwayat berdampingan, killfeed tetap ringkas */
+    @media (min-width: 768px) and (max-width: 1023px) {
+      .kf { grid-template-columns: minmax(0,1fr) auto auto; gap: .5rem; }
+      .kf .ico { display: none; }
+      .kf .amt { font-size: 16px; }
+      .badge { max-width: 130px; overflow: hidden; text-overflow: ellipsis; }
+      .cat-btn { font-size: 14px; }
+      .tab { padding: 0 .55rem; font-size: 13px; letter-spacing: .05em; }
+    }
+
+    /* Tablet & desktop: riwayat scroll sendiri, form ikut nempel saat scroll (kalau layarnya cukup tinggi) */
+    @media (min-width: 768px) {
+      .log-scroll { overflow-y: auto; max-height: min(72vh, 680px); }
+    }
+    @media (min-width: 768px) and (min-height: 760px) {
+      .form-col { position: sticky; top: 16px; }
+    }
+
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation: none !important; transition: none !important; }
     }
@@ -265,12 +308,12 @@
     <div class="h-px w-full mb-6" style="background:linear-gradient(90deg,var(--red),var(--line-2) 30%,transparent)"></div>
 
     <!-- ================= DASHBOARD CARDS ================= -->
-    <section aria-label="Ringkasan keuangan" class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-      <div class="glow col-span-2 lg:col-span-1" style="--accent:var(--red)">
+    <section aria-label="Ringkasan keuangan" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div class="glow col-span-2 md:col-span-3 lg:col-span-1" style="--accent:var(--red)">
         <div class="frame cut h-full"><div class="inner cut stat p-4 sm:p-5">
           <span class="tick"></span>
           <div class="flex items-center justify-between"><p class="label">Saldo Utama</p><span class="step dim">01</span></div>
-          <p id="s-balance" class="amount tnum text-[30px] sm:text-[32px]">Rp 0</p>
+          <p id="s-balance" class="amount tnum amt-xl">Rp 0</p>
           <div class="flex items-center gap-2"><div class="stripes h-2 w-12"></div><span class="text-[13px] muted">Siap dipakai</span></div>
           <span class="corner"></span>
         </div></div>
@@ -280,7 +323,7 @@
         <div class="frame cut h-full"><div class="inner cut stat p-4 sm:p-5">
           <span class="tick"></span>
           <div class="flex items-center justify-between"><p class="label">Pemasukan</p><span class="step dim">02</span></div>
-          <p id="s-income" class="amount tnum text-[22px] sm:text-[26px]" style="color:var(--in)">Rp 0</p>
+          <p id="s-income" class="amount tnum amt-md" style="color:var(--in)">Rp 0</p>
           <div class="flex items-center gap-2"><div class="stripes h-2 w-8"></div><span id="c-income" class="text-[13px] muted">0 transaksi</span></div>
           <span class="corner"></span>
         </div></div>
@@ -290,17 +333,17 @@
         <div class="frame cut h-full"><div class="inner cut stat p-4 sm:p-5">
           <span class="tick"></span>
           <div class="flex items-center justify-between"><p class="label">Pengeluaran</p><span class="step dim">03</span></div>
-          <p id="s-expense" class="amount tnum text-[22px] sm:text-[26px]" style="color:var(--out)">Rp 0</p>
+          <p id="s-expense" class="amount tnum amt-md" style="color:var(--out)">Rp 0</p>
           <div class="flex items-center gap-2"><div class="stripes h-2 w-8"></div><span id="c-expense" class="text-[13px] muted">0 transaksi</span></div>
           <span class="corner"></span>
         </div></div>
       </div>
 
-      <div class="glow col-span-2 lg:col-span-1" style="--accent:var(--save)">
+      <div class="glow col-span-2 md:col-span-1" style="--accent:var(--save)">
         <div class="frame cut h-full"><div class="inner cut stat p-4 sm:p-5">
           <span class="tick"></span>
           <div class="flex items-center justify-between"><p class="label">Total Tabungan</p><span class="step dim">04</span></div>
-          <p id="s-saving" class="amount tnum text-[26px] sm:text-[28px]" style="color:var(--save)">Rp 0</p>
+          <p id="s-saving" class="amount tnum amt-md" style="color:var(--save)">Rp 0</p>
           <div class="flex items-center gap-2"><div class="stripes h-2 w-8"></div><span id="c-saving" class="text-[13px] muted">0x setor</span></div>
           <span class="corner"></span>
         </div></div>
@@ -310,17 +353,17 @@
     <!-- Ringkasan hari ini -->
     <div class="mt-3 sm:mt-4">
       <div class="today cut-r">
-        <div><p class="label">Masuk hari ini</p><p id="t-in" class="tnum font-bold text-[17px] mt-0.5" style="color:var(--in)">Rp 0</p></div>
-        <div><p class="label">Keluar hari ini</p><p id="t-out" class="tnum font-bold text-[17px] mt-0.5" style="color:var(--out)">Rp 0</p></div>
-        <div><p class="label">Nabung hari ini</p><p id="t-save" class="tnum font-bold text-[17px] mt-0.5" style="color:var(--save)">Rp 0</p></div>
+        <div><p class="label">Masuk<span class="hidden sm:inline"> hari ini</span></p><p id="t-in" class="today-amt tnum font-bold mt-0.5" style="color:var(--in)">Rp 0</p></div>
+        <div><p class="label">Keluar<span class="hidden sm:inline"> hari ini</span></p><p id="t-out" class="today-amt tnum font-bold mt-0.5" style="color:var(--out)">Rp 0</p></div>
+        <div><p class="label">Nabung<span class="hidden sm:inline"> hari ini</span></p><p id="t-save" class="today-amt tnum font-bold mt-0.5" style="color:var(--save)">Rp 0</p></div>
       </div>
     </div>
 
     <!-- ================= MAIN ================= -->
-    <main class="grid lg:grid-cols-5 gap-6 lg:gap-8 mt-8 items-start">
+    <main class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 lg:gap-8 mt-6 sm:mt-8 items-start">
 
       <!-- ---------- FORM ---------- -->
-      <section class="lg:col-span-2 lg:sticky lg:top-4" aria-labelledby="form-title">
+      <section class="form-col min-w-0 lg:col-span-2" aria-labelledby="form-title">
         <div class="sec-head">
           <h2 id="form-title" class="sec-title font-display">Input Transaksi</h2>
         </div>
@@ -360,7 +403,7 @@
               <div class="flex items-baseline gap-2 mb-2.5"><span class="step">03</span><label for="tx-amount" class="label">Nominal</label></div>
               <div class="money cut-r">
                 <span class="pre">Rp</span>
-                <input id="tx-amount" class="tnum" type="text" inputmode="numeric" placeholder="0" />
+                <input id="tx-amount" class="tnum" size="1" type="text" inputmode="numeric" placeholder="0" />
               </div>
               <div class="grid grid-cols-3 gap-2 mt-2.5" id="quick">
                 <button type="button" class="chip cut-l tnum" data-add="10000">+10rb</button>
@@ -379,7 +422,7 @@
       </section>
 
       <!-- ---------- RIWAYAT ---------- -->
-      <section class="lg:col-span-3" aria-labelledby="log-title">
+      <section class="min-w-0 lg:col-span-3" aria-labelledby="log-title">
         <div class="sec-head">
           <h2 id="log-title" class="sec-title font-display">Riwayat Transaksi</h2>
           <button id="wipe" type="button" class="label hover:text-[var(--red)] transition-colors">Hapus semua</button>
@@ -393,7 +436,7 @@
               <button class="tab" role="tab" data-filter="out"  aria-selected="false">Keluar <span class="n tnum" data-count="out">0</span></button>
               <button class="tab" role="tab" data-filter="save" aria-selected="false">Nabung <span class="n tnum" data-count="save">0</span></button>
             </div>
-            <div id="log" class="scroll overflow-y-auto pb-3" style="max-height:min(70vh,660px)"></div>
+            <div id="log" class="log-scroll scroll pb-3"></div>
           </div>
         </div>
       </section>
